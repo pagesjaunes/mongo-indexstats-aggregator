@@ -1,7 +1,6 @@
 # -*-coding:UTF-8 -*
 
 import argparse
-# import sys
 import os
 import glob
 import re
@@ -32,7 +31,7 @@ CONST_CHAMPS_NB = "nb"
 CONST_CHAMPS_DATE_DEBUT = "date_debut"
 CONST_CHAMPS_NB_GLOBAL = "nb_global"
 
-# 
+#
 # Remplacement des format Long et Date de Mongo par leur équivalent en json
 #
 def replaceLongAndDate(line):

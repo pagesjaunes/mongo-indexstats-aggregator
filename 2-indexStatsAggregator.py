@@ -1,7 +1,6 @@
 # -*-coding:UTF-8 -*
 
 import argparse
-# import sys
 import os
 import glob
 import re
