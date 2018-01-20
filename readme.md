@@ -23,8 +23,3 @@ Pré-requis
         - ``rs.slaveOk(false)``
 - fortement conseillé : lancé chaque script avec l'option ``--help`` pour bien comprendre ce qui est possible de faire
 
-TODOs
----
-- EVOL : rendre le nb de noeuds paramétrable ou suppimer la gestion des noeuds
-- EVOL : rendre la gestion des seuils pour les couleurs paramétrable
-- ANO : option -p et -m incompatible => -p prends le pas alors que ne devrait pas (humanize avec des espaces)
