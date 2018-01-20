@@ -21,9 +21,6 @@ Pré-requis
         - ``use MA_BASEDEDONNEES;``
         - ``db.MA_COLLECTION.aggregate( [ { $indexStats: { } } ] )``
         - ``rs.slaveOk(false)``
-
-Infos techniques
----
 - fortement conseillé : lancé chaque script avec l'option ``--help`` pour bien comprendre ce qui est possible de faire
 
 TODOs
