@@ -3,157 +3,186 @@
 import argparse
 import os
 import glob
-import re
-import json
-from pprint import pprint
+#import json
+#from pprint import pprint
 
 from bson import json_util
 
 import utils
 
-# conf pour session cassandra
+# arguments de la ligne de commande
 args = None
 
 # map des index et des leurs donnees
 mapIndex = {}
 
-# constantes
-CONST_NOEUD_PRIM = "PRIMARY"
-CONST_NOEUD_SEC1 = "SECONDARY-1"
-CONST_NOEUD_SEC2 = "SECONDARY-2"
+# extension des fichiers représentant le résultat de la commande mongo "indexstats"
+CONST_FILE_EXTENSION = ".indexstats"
 
+# liste des champs présent dans la réponse JSON dans un fichier résultat de la commande mongo "indexstats"
 CONST_CHAMPS_NAME = "name"
 CONST_CHAMPS_HOST = "host"
 CONST_CHAMPS_ACCESSES = "accesses"
 CONST_CHAMPS_ACCESSES_OPS = "ops"
 CONST_CHAMPS_ACCESSES_SINCE = "since"
+
+# liste des champs utilisés dans la map contenant les données aggrégées
 CONST_CHAMPS_NB = "nb"
 CONST_CHAMPS_DATE_DEBUT = "date_debut"
 CONST_CHAMPS_NB_GLOBAL = "nb_global"
 
 #
-# Remplacement des format Long et Date de Mongo par leur équivalent en json
+# Calcul du nom du noeud à partir d'un objet fichier
 #
-def replaceLongAndDate(line):
-    #log_trace("line BEFORE_REPLACE= " + line)
-
-    # remplacement des NumberLong
-    line = re.sub(r'NumberLong\(([0-9]*)\)',
-                    r'{"$numberLong": "\1"}',
-                    line)
-
-    # remplacement des ISODate
-    line = re.sub(r'ISODate\((\S*)\)',
-                    r'{"$date": \1}',
-                    line)
-
-    #log_trace("line AFTER_REPLACE= " + line)
-    return line
+def getNodeNameFromFile(file):
+    filename = os.path.basename(file.name)
+    node_name = filename
+    if node_name.endswith(CONST_FILE_EXTENSION) :
+        node_name = node_name.rsplit('.', 1)[0]
+    return node_name
 
 #
-# Récupération du fichier d'un certain type dans un répertoire
-#
-def getJsonFile(fileType, dirName):
-    fprimTab = glob.glob(dirName + '/*'+fileType+'.json.orig')
-
-    utils.log_trace("fprimTab = " + str(len(fprimTab)))
-    if len(fprimTab) > 1 :
-        utils.log_erreur('Plusieurs fichiers "'+fileType+'" present dans le repertoire "' + dirName + '"\n')
-    if len(fprimTab) == 0 :
-        utils.log_erreur('Pas de fichier "'+fileType+'" present dans le repertoire "' + dirName + '"\n')
-    
-    utils.log_debug('Fichier "'+fileType+'" trouve = ' + fprimTab[0])
-
-    try:
-        fic = open(fprimTab[0], "r")
-    except:
-        utils.log_erreur("Erreur durant l'ouverture du fichier " + fprimTab[0])
-    
-    return fic
-
-#
-# Récupération de la liste des fichiers d'un répertoire tout en validant le paramètre "dirName"
+# Récupération de la liste des fichiers INDEXSTATS d'un répertoire (tout en validant le paramètre "dirName")
 #
 def ETAPE1_validateDirParamAndGetFilesTab(dirName, paramName):
-    utils.log_debug('Controle parametre obligatoire "'+paramName+'"')
+    utils.log_debug("==> ETAPE1_validateDirParamAndGetFilesTab")
+
+    # contrôle paramètre obligatoire correspondant au répertoire dans lequel sont stockés les fichiers INDEXSTATS
+    utils.log_debug("Contrôle paramètre obligatoire [" + paramName + "]")
     if dirName is None:
-        utils.log_erreur(paramName+' est obligatoire\n')
+        utils.log_erreur("[" + paramName + "] est obligatoire")
 
-    utils.log_debug('Controle validite du repertoire "'+dirName+'"')
+    # contrôle validité du répertoire
+    utils.log_debug("Contrôle validité du répertoire [" + dirName + "]")
     if not os.path.isdir(dirName):
-        utils.log_erreur(dirName+' n\'est pas un repertoire\n')
+        utils.log_erreur("[" + dirName + "] n'est pas un répertoire")
 
-    utils.log_debug('Recuperation du fichier de type "'+CONST_NOEUD_PRIM+'" dans le repertoire "'+dirName+'"')
-    fprim = getJsonFile(CONST_NOEUD_PRIM, dirName)
-    
-    utils.log_debug('Recuperation du fichier de type "'+CONST_NOEUD_SEC1+'" dans le repertoire "'+dirName+'"')
-    fsec1 = getJsonFile(CONST_NOEUD_SEC1, dirName)
-    
-    utils.log_debug('Recuperation du fichier de type "'+CONST_NOEUD_SEC2+'" dans le repertoire "'+dirName+'"')
-    fsec2 = getJsonFile(CONST_NOEUD_SEC2, dirName)
+    # récupération des fichiers INDEXSTATS du répertoire passé en paramètre
+    pattern_fic_extension = "*" + CONST_FILE_EXTENSION
+    utils.log_debug("Récupération des fichiers [" + pattern_fic_extension + "] dans le répertoire [" + dirName + "]")
+    filesTab = glob.glob(dirName + "/" + pattern_fic_extension)
 
-    ficTab = [fprim, fsec1, fsec2]
+    # contrôle du nb de ficheirs trouvés
+    if len(filesTab) == 0 :
+        utils.log_erreur("Pas de fichiers INDEXSTATS présents dans le répertoire [" + dirName + "]")
+    utils.log_debug("nb fic INDEXSTATS trouvés = " + str(len(filesTab)))
 
-    return ficTab
+    # ouverture et mise de côté des fichiers INDEXSTATS trouvés
+    lstFicOpened = []
+    for file in filesTab : 
+        try:
+            ficOpened = open(file, "r")
+            lstFicOpened.append(ficOpened)
+        except:
+            utils.log_erreur("Erreur durant l'ouverture du fichier [" + file + "]")
+
+    utils.log_debug("nb fic INDEXSTATS ouverts avec succés = " + str(len(lstFicOpened)))
+
+    return lstFicOpened
 
 #
 # Récupération des données d'un fichier
 #
-def ETAPE2_remplirMapIndexAvecFichier(file, type_noeud):
-    utils.log_debug('Remplissage de la MAP pour le noeud "'+type_noeud+'"')
+def ETAPE2_remplirMapIndexAvecFichier(filesTab):
+    
+    utils.log_debug("==> ETAPE2_remplirMapIndexAvecFichier")
 
-    for line in file : 
+    # Parcours de l'ensemble des fichiers INDEXSTATS passés en paramètre
+    for file in filesTab :
 
-        # retravaille de la ligne et parsing JSON
-        line = replaceLongAndDate(line)
-        data = json_util.loads(line)
-        
-        index_name = data[CONST_CHAMPS_NAME]
-        host = data[CONST_CHAMPS_HOST]
-        nb = data[CONST_CHAMPS_ACCESSES][CONST_CHAMPS_ACCESSES_OPS]
-        date_deb = data[CONST_CHAMPS_ACCESSES][CONST_CHAMPS_ACCESSES_SINCE]
+        filename = os.path.basename(file.name)
+        node_name = getNodeNameFromFile(file)
 
-        mapHostInfo = {CONST_CHAMPS_HOST : host, CONST_CHAMPS_NB : nb, CONST_CHAMPS_DATE_DEBUT : date_deb}
+        utils.log_debug("Remplissage de la MAP pour le fichier [" + filename + "] (node_name = [" + node_name + "])")
 
-        if type_noeud == CONST_NOEUD_PRIM:
-            utils.log_trace("Initialisation de l'index '" + index_name + "' pour le noeud " + type_noeud)
-            mapIndex[index_name] = {CONST_CHAMPS_NB_GLOBAL : nb , CONST_NOEUD_PRIM : mapHostInfo, CONST_NOEUD_SEC1 : {}, CONST_NOEUD_SEC2 : {}}
-        else:
-            if index_name in mapIndex :
-                utils.log_trace("Update de l\'index '" + index_name + "' pour le noeud " + type_noeud)
-                mapIndex[index_name][CONST_CHAMPS_NB_GLOBAL] = mapIndex[index_name][CONST_CHAMPS_NB_GLOBAL] + nb
-                mapIndex[index_name][type_noeud] = mapHostInfo
-            else:
-                utils.log_erreur("L'index courant '" + index_name + "' n'existe pas encore dans le fichier du noeud " + CONST_NOEUD_PRIM + " => pas normal !")
+        # parcours de l'ensemble de ligne du ficheir INDEXSTAT courant
+        for line in file : 
+
+            # retravaille de la ligne (remplacement Long et Date) et parsing JSON
+            line = utils.mongoReplaceLongAndDate(line)
+            data = json_util.loads(line)
+            
+            index_name = data[CONST_CHAMPS_NAME]
+            host = data[CONST_CHAMPS_HOST]
+            nb = data[CONST_CHAMPS_ACCESSES][CONST_CHAMPS_ACCESSES_OPS]
+            date_deb = data[CONST_CHAMPS_ACCESSES][CONST_CHAMPS_ACCESSES_SINCE]
+
+            # Sauvegarde dans la MAP des données des infos nécessaires pour la suite du traitement
+            mapHostInfo = {CONST_CHAMPS_HOST : host, CONST_CHAMPS_NB : nb, CONST_CHAMPS_DATE_DEBUT : date_deb}
+
+            if index_name not in mapIndex :
+                utils.log_trace("MAP INDEX - Initialisation de l'index [" + index_name + "]")
+                mapIndex[index_name] = {CONST_CHAMPS_NB_GLOBAL : 0}
+
+            utils.log_trace("MAP INDEX - Update de l'index [" + index_name + "]")
+            mapIndex[index_name][CONST_CHAMPS_NB_GLOBAL] = mapIndex[index_name][CONST_CHAMPS_NB_GLOBAL] + nb
+            mapIndex[index_name][node_name] = mapHostInfo
+
+        # fermeture du fichier INDEXSTAT préalablement ouvert
+        file.close()
+
+#
+# Affichage des données d'entête
+#
+def ETAPE3_afficherDonneesEntete(filesTab) :
+    
+    utils.log_debug("==> ETAPE3_afficherDonneesEntete")
+    
+    if not args.miniprint:
+        utils.log_retourchariot("")
+
+    entete = ""
+    separateur = ""
+    if args.miniprint:
+        entete = entete + "# "
+    elif args.prettyprint:
+        entete = entete + "Format d'affichage : "
+        separateur = " "
+
+    entete = entete + "<INDEX_NAME>"
+    for file in filesTab :
+        node_name = getNodeNameFromFile(file)
+        entete = entete + separateur + "|||" + separateur + "<NB_" + node_name + ">"
+    entete = entete + separateur  + "|||" + separateur + "<NB_GLOBAL>"
+
+    utils.log_retourchariot(entete)
+
+    # if args.prettyprint:
+    if not args.miniprint:
+        utils.log_retourchariot("")
 
 #
 # Affichage des données aggrégées d'un noeud mongo
 #
-def afficherDonneesDuNoeud(index_name, noeud, line_prettyprint):
-    utils.log_debug('Affichage des donnees de l\'index "'+index_name+'" pour le noeud "'+noeud+'"')
+def recupererDonneesDuNoeud(index_name, noeud, line_prettyprint):
+    utils.log_debug("Récupération des données de l'index ["+ index_name + "] pour le noeud [" + noeud + "]")
 
     if mapIndex[index_name][noeud] :
         host = mapIndex[index_name][noeud][CONST_CHAMPS_HOST]
         nb = mapIndex[index_name][noeud][CONST_CHAMPS_NB]
-        nb_humanize = utils.humanize_int(nb)
         date_deb = str(mapIndex[index_name][noeud][CONST_CHAMPS_DATE_DEBUT])
+
+        nb_humanize = utils.humanize_int(nb)
+        nb_str = str(nb)
+
         if args.prettyprint:
+            # TODO DDC : manque pas un espace séparteur avant les ||| ?
             line_prettyprint = line_prettyprint + "||| " + nb_humanize + " "
         elif args.miniprint:
-            line_prettyprint = line_prettyprint + "|||" + str(nb)
+            line_prettyprint = line_prettyprint + "|||" + nb_str
         else:
-            utils.log_retourchariot("   "+noeud+" = " + host)
-            utils.log_retourchariot("      "+CONST_CHAMPS_NB+" = " + nb_humanize)
-            utils.log_retourchariot("      "+CONST_CHAMPS_DATE_DEBUT+" = " + date_deb)
+            utils.log_retourchariot("   " + noeud + " = " + host)
+            utils.log_retourchariot("      " + CONST_CHAMPS_NB + " = " + nb_humanize)
+            utils.log_retourchariot("      " + CONST_CHAMPS_DATE_DEBUT + " = " + date_deb)
     else:
-        utils.log_erreur("L'index courant '" + index_name + "' n'existe pas pour le noeud " + CONST_NOEUD_PRIM + " => pas normal !")
+        utils.log_erreur("L'index [" + index_name + "] n'existe pas pour le noeud [" + noeud + "] => pas normal ! (ANOMALIE TECH ?)")
 
     return line_prettyprint
 
 #
 # Méthode utilitaire d'affichage colorisée dans la console (si option active)
 #
-def calculerChaineAAfficher(chaine, type):
+def coloriserChaineAAfficher(chaine, type):
     if args.color:
         if type=="ERREUR":
             return "\033[37;41;5m "+chaine+" \033[0m"
@@ -166,37 +195,45 @@ def calculerChaineAAfficher(chaine, type):
 #
 # Affichage des données aggrégées des tous les fichiers
 #
-def ETAPE3_afficherDonnees():
-    utils.log_debug('Affichage des donnees')
+def ETAPE4_afficherDonnees(filesTab):
+    
+    utils.log_debug("==> ETAPE4_afficherDonnees")
+
     nbIndex=0
     nbIndexNonUtilises=0
     nbIndexPeuUtilises=0
     nbIndexTresPeuUtilises=0
     nbIndexTresUtilises=0
+
+    # parcours des index triés par nom
     for key in sorted(mapIndex.keys()) :
-        index_name = key
+        #index_name = key
+        index_name = str(key) # forçage en chaine car pb dans les logs si utilisation de l'accentuation avec index_name
         nb_global = mapIndex[index_name][CONST_CHAMPS_NB_GLOBAL]
         line_prettyprint = ""
 
         nb_global_str_human = utils.humanize_int(nb_global)
+
+        # gestion de la colorisation et du dénombrement des indexs suivant les seuils d'utilisation
         if nb_global==0:
             # log("0 => "+str(len(nb_global)))
-            nb_global_str_human = calculerChaineAAfficher(nb_global_str_human, "ERREUR")
+            nb_global_str_human = coloriserChaineAAfficher(nb_global_str_human, "ERREUR")
             nbIndexNonUtilises = nbIndexNonUtilises + 1
         elif nb_global < 10 :
             # log("<2 => "+str(len(nb_global)))
-            nb_global_str_human = calculerChaineAAfficher(nb_global_str_human, "WARN")
+            nb_global_str_human = coloriserChaineAAfficher(nb_global_str_human, "WARN")
             nbIndexTresPeuUtilises = nbIndexTresPeuUtilises + 1
         elif nb_global < 100 :
             # log("<3 => "+str(len(nb_global)))
-            nb_global_str_human = calculerChaineAAfficher(nb_global_str_human, "WARN")
+            nb_global_str_human = coloriserChaineAAfficher(nb_global_str_human, "WARN")
             nbIndexPeuUtilises = nbIndexPeuUtilises + 1
 
         if nb_global > 100000 :
             # log(">5 => "+str(len(nb_global)))
-            nb_global_str_human = calculerChaineAAfficher(nb_global_str_human, "INFO")
+            nb_global_str_human = coloriserChaineAAfficher(nb_global_str_human, "INFO")
             nbIndexTresUtilises = nbIndexTresUtilises + 1
 
+        # gestion affichage suivant l'option d'affichage choisie
         if args.prettyprint:
             line_prettyprint = index_name + " "
         elif args.miniprint:
@@ -205,10 +242,12 @@ def ETAPE3_afficherDonnees():
             utils.log_retourchariot(CONST_CHAMPS_NAME + " = " + index_name)
             utils.log_retourchariot("   "+CONST_CHAMPS_NB_GLOBAL+" = " + nb_global_str_human)
 
-        line_prettyprint = afficherDonneesDuNoeud(index_name, CONST_NOEUD_PRIM, line_prettyprint)
-        line_prettyprint = afficherDonneesDuNoeud(index_name, CONST_NOEUD_SEC1, line_prettyprint)
-        line_prettyprint = afficherDonneesDuNoeud(index_name, CONST_NOEUD_SEC2, line_prettyprint)
+        # parcours des noeuds (donc des fichiers) afin de récupérer l'affichage des données du noeud
+        for file in filesTab :
+            node_name = getNodeNameFromFile(file)
+            line_prettyprint = recupererDonneesDuNoeud(index_name, node_name, line_prettyprint)
 
+        # gestion affichage du résultats du noeud
         if args.prettyprint:
             utils.log_retourchariot(line_prettyprint + "||| " + nb_global_str_human)
         elif args.miniprint:
@@ -216,34 +255,36 @@ def ETAPE3_afficherDonnees():
         else:
             utils.log_retourchariot("")
 
+        # incrément du nb de noeud total
         nbIndex = nbIndex + 1
         
+    # Affichage du dénombrement des indexs (par seuil) suivant le type d'affichage
     if not args.miniprint :
         utils.log_retourchariot("")
         utils.log_retourchariot("NB indexs analyses : " + str(nbIndex))
-        utils.log_retourchariot("NB indexs TRES utilises (>= 100 000) : "+calculerChaineAAfficher(str(nbIndexTresUtilises), "INFO"))
-        utils.log_retourchariot("NB indexs PEU utilises (< 100) : "+calculerChaineAAfficher(str(nbIndexPeuUtilises), "WARN"))
-        utils.log_retourchariot("NB indexs TRES PEU utilises (< 10) : "+calculerChaineAAfficher(str(nbIndexTresPeuUtilises), "WARN"))
-        utils.log_retourchariot("NB indexs NON utilises (= 0) : "+calculerChaineAAfficher(str(nbIndexNonUtilises), "ERREUR")+"\n")
+        utils.log_retourchariot("NB indexs TRES utilises (>= 100 000) : " + coloriserChaineAAfficher(str(nbIndexTresUtilises), "INFO"))
+        utils.log_retourchariot("NB indexs PEU utilises (< 100) : " + coloriserChaineAAfficher(str(nbIndexPeuUtilises), "WARN"))
+        utils.log_retourchariot("NB indexs TRES PEU utilises (< 10) : " + coloriserChaineAAfficher(str(nbIndexTresPeuUtilises), "WARN"))
+        utils.log_retourchariot("NB indexs NON utilises (= 0) : " + coloriserChaineAAfficher(str(nbIndexNonUtilises), "ERREUR")+"\n")
     else :
         utils.log_retourchariot("%%%RESUME%%%nb_indexs|||" + str(nbIndex))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_utilises_GE100000|||"+str(nbIndexTresUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_peu_utilises_LT100|||"+str(nbIndexPeuUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_peu_utilises_LT10|||"+str(nbIndexTresPeuUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_non_utilises|||"+str(nbIndexNonUtilises))
+        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_utilises_GE100000|||" + str(nbIndexTresUtilises))
+        utils.log_retourchariot("%%%RESUME%%%nb_indexs_peu_utilises_LT100|||" + str(nbIndexPeuUtilises))
+        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_peu_utilises_LT10|||" + str(nbIndexTresPeuUtilises))
+        utils.log_retourchariot("%%%RESUME%%%nb_indexs_non_utilises|||" + str(nbIndexNonUtilises))
 
 
 def main(): 
 
     # Initialisation arguments
     global args
-    parser = argparse.ArgumentParser(description='Script Python (2.7.X) permettant d\'aggreger les donnees \'indexStats\' de tous les noeuds d\'un cluster mongo (3 noeuds = 1 PRIMARY et 2 SECONDARY)')
-    parser.add_argument('-d', '--dir', help='Repertoire contenant le resultat de la commande \'indexStats\' pour les 3 noeuds ('+CONST_NOEUD_PRIM+', '+CONST_NOEUD_SEC1+', '+CONST_NOEUD_SEC2+') du mongo')
-    parser.add_argument('-p', '--prettyprint', help='Afficher des resultats de maniere minifiee', action='store_true')
-    parser.add_argument('-m', '--miniprint', help='Afficher des resultats de maniere la plus minimaliste possible (pour futur traitement automatique du résultat)', action='store_true')
-    parser.add_argument('-c', '--color', help='Afficher des resultats avec de la couleur', action='store_true')
-    parser.add_argument('--debug', help='Afficher log de debug dans la console', action='store_true')
-    parser.add_argument('--trace', help='Afficher log de debug et trace dans la console', action='store_true')
+    parser = argparse.ArgumentParser(description="Script Python (2.7.X) permettant d'aggréger les données 'indexStats' de tous les noeuds d'un cluster mongo")
+    parser.add_argument("-d", "--dir", help="Répertoire contenant le résultat de la commande mongo 'indexStats' de chaque noeud du mongo")
+    parser.add_argument("-p", "--prettyprint", help="Afficher des résultats de manière minifiée", action="store_true")
+    parser.add_argument("-m", "--miniprint", help="Afficher des résultats de manière la plus minimaliste possible (pour futur traitement automatique du résultat)", action="store_true")
+    parser.add_argument("-c", "--color", help="Afficher des résultats avec de la couleur", action="store_true")
+    parser.add_argument("--debug", help="Afficher log de debug dans la console", action="store_true")
+    parser.add_argument("--trace", help="Afficher log de debug et trace dans la console", action="store_true")
     
     args = parser.parse_args()
 
@@ -251,34 +292,13 @@ def main():
     utils.set_trace_level(args.trace)
     utils.set_debug_level(args.debug | args.trace)
 
-    # Controle options obligatoires
     filesTab = ETAPE1_validateDirParamAndGetFilesTab(args.dir, "--dir, -d")
-    fprim = filesTab[0]
-    fsec1 = filesTab[1]
-    fsec2 = filesTab[2]
 
-    # analyse des fichiers et mis de cote des donnees (dans une map)
-    ETAPE2_remplirMapIndexAvecFichier(fprim, CONST_NOEUD_PRIM)
-    fprim.close()
+    ETAPE2_remplirMapIndexAvecFichier(filesTab)
 
-    ETAPE2_remplirMapIndexAvecFichier(fsec1, CONST_NOEUD_SEC1)
-    fsec1.close()
+    ETAPE3_afficherDonneesEntete(filesTab)
 
-    ETAPE2_remplirMapIndexAvecFichier(fsec2, CONST_NOEUD_SEC2)
-    fsec2.close()
-
-    # affichage des donnees consolidees
-    if not args.miniprint:
-        utils.log_retourchariot("")
-
-    if args.miniprint:
-        utils.log_retourchariot("# <INDEX_NAME>|||<NB_PRIMARY>|||<NB_SECONDARY1>|||<NB_SECONDARY2>|||<NB_GLOBAL>")
-    elif args.prettyprint:
-        utils.log_retourchariot("Format d'affichage : <INDEX_NAME> ||| <NB_PRIMARY> ||| <NB_SECONDARY1> ||| <NB_SECONDARY2> ||| <NB_GLOBAL>")
-        utils.log_retourchariot("")
+    ETAPE4_afficherDonnees(filesTab)
     
-
-    ETAPE3_afficherDonnees()
-    
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

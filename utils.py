@@ -2,6 +2,7 @@
 
 import sys
 import locale
+import re
 
 # variables stockant l'état actuel du niveau de log => reinit plus tard dans le main
 isTrace = False
@@ -43,7 +44,7 @@ def log_retourchariot(msg):
 
 # sortir en erreur
 def log_erreur(msg):
-    log(msg)
+    log(msg + "\n")
     sys.exit(1)
 
 def humanize_int(nb):
@@ -55,6 +56,23 @@ def humanize_int(nb):
     log_debug("res=" + res)
     locale.resetlocale(locale.LC_ALL)
     return res
+
+def mongoReplaceLongAndDate(line):
+    #log_trace("line BEFORE_REPLACE= " + line)
+
+    # remplacement des NumberLong
+    line = re.sub(r'NumberLong\(([0-9]*)\)',
+                    r'{"$numberLong": "\1"}',
+                    line)
+
+    # remplacement des ISODate
+    line = re.sub(r'ISODate\((\S*)\)',
+                    r'{"$date": \1}',
+                    line)
+
+    #log_trace("line AFTER_REPLACE= " + line)
+    return line
+
 
 # lancement de ce script => NE FAIT QUE DES TESTS des fonctions dispos
 if __name__ == '__main__':

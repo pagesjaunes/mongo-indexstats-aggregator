@@ -39,7 +39,7 @@ def ETAPE1_validateDirParamAndGetListResFiles(dirName, paramName):
         utils.log_erreur(dirName+' n\'est pas un repertoire\n')
 
     utils.log_debug('Recuperation de la liste des fichiers de type "*.res" dans le repertoire "'+dirName+'"')
-    ficTab = glob.glob(dirName + '/*.res')
+    ficTab = glob.glob(dirName + '/*.*')
 
     return ficTab
 

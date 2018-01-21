@@ -2,13 +2,13 @@ Outil d'analyse des résultats de la commande "indexStats" de mongo
 ==============================
 
 Cet outil contient 2 scripts python permettant de faire :
-- script "ANALYZER" : analyser le résultat de la commande ``indexStats`` de Mongo (dispo depuis la v3.2) sur un cluster de 3 noeuds (pour le moment)
+- script "ANALYZER" : analyser le résultat de la commande ``indexStats`` de Mongo (dispo depuis la v3.2) sur un cluster de X noeuds
 - script "AGGREGATOR" : aggréger un ensemble de résultats de cette analyse de manière synthétique (dans différents type de sortie)
 
 Pré-requis
 ---
 - python 2.7.X
-- 3 fichiers de résultats (PRIMARY, SECONDARY 1 et SECONDARY 2) => 1 fichier de résultat brut par noeud du cluster mongo (3 noeuds obligatoires pour le moment) issu de la commande suivante :
+- 1 fichier de résultat brut par noeud du cluster mongo issu de la commande suivante :
     ``db.MA_COLLECTION.aggregate( [ { $indexStats: { } } ] )``
     - ATTENTION : il se peut qu'il y ait plusieurs pages de résultats (ATTENTION au ``Type "it" for more``)
 - procédure de lancement de la commande ``indexStats`` sur un noeud du cluster mongo
