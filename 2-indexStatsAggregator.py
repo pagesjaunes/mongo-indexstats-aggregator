@@ -17,6 +17,12 @@ args = None
 # map des index et des leurs donnees
 mapIndex = {}
 
+# map des resumes et de meurs donnees
+mapResume = {}
+
+CONST_CHAMPS_RESUME_DATE_TIR = "%%%RESUME%%%date_tir"
+CONST_CHAMPS_RESUME_DUREE = "%%%RESUME%%%duree"
+
 #
 # Validation du paramètre "output"
 #
@@ -47,7 +53,7 @@ def ETAPE1_validateDirParamAndGetListResFiles(dirName, paramName):
 # Récupération des données des fichiers avec filtrage des lignes à analysées
 #
 def ETAPE2_remplirMapIndexAvecListeFichiers(ficNameTab):
-    utils.log_debug('Remplissage de la MAP avec le(s) '+str(len(ficNameTab))+' fichier(s) trouvés')
+    utils.log_debug('Remplissage de la MAP avec le(s) ' + str(len(ficNameTab)) + ' fichier(s) trouvés')
 
     for ficName in ficNameTab : 
         utils.log_debug("Ouverture fichier ["+ficName+"]")
@@ -56,26 +62,82 @@ def ETAPE2_remplirMapIndexAvecListeFichiers(ficNameTab):
             with open(ficName) as file:
                 for line in file:
                     if line.startswith("#") :
-                        utils.log_trace('COMMENTAIRE => '+line, False)
+                        utils.log_trace('COMMENTAIRE => ' + line, False)
                         continue
                     
                     if line.startswith("%%%RESUME%%%") :
-                        utils.log_trace('RESUME => '+line, False)
+                        # utils.log_trace('RESUME => '+line, False)
+                        ajouterLigneIndexDansMapResume(line, ficName)
                         continue
                     
                     # utils.log_trace('Ligne INDEX => '+line)
-
-                    ajouterLigneIndexDansMap(line, ficName)
+                    ajouterLigneIndexDansMapIndex(line, ficName)
 
         except IOError as e:
             utils.log_erreur("Erreur durant l'ouverture du fichier [{0}] => I/O error({1}): {2}".format(ficName, e.errno, e.strerror))
 
 
+def getInfosDuTir(ficNameAbsolute) :
+    ficName = os.path.basename(ficNameAbsolute)
+    ficNameWithoutExt = ficName.replace(".res", "")
+
+    ficNameSplitTab = ficNameWithoutExt.split("_")
+    if len(ficNameSplitTab) != 2 :
+        raise Exception("Pb dans le formatage du nom du fichier => formatage accepté '<CHAINE>_<CHAINE FORMAT DATE YYYYMMDDHHmmSS>.res'".format(line))
+    
+    nomDuTir = ficNameSplitTab[0]
+    dateDuTir = ficNameSplitTab[1]
+
+    return nomDuTir, dateDuTir
+
 #
 # Analyse et mise de côté des données d'un ligne d'un fichier
 #
-def ajouterLigneIndexDansMap(line, ficNameAbsolute):
-    utils.log_trace('INDEX => '+line, False)
+def ajouterLigneIndexDansMapResume(line, ficNameAbsolute):
+    utils.log_trace('RESUME => ' + line, False)
+
+    lineTab = line.split("|||")
+    if len(lineTab) != 2 :
+        raise Exception("Pb dans le formatage de la ligne du résumé => il est nécessaire d'y avoir 2 chaines séparées par '|||' => ligne : {0}".format(line))
+    
+    attributeName = lineTab[0]
+    value = lineTab[1]
+
+    value = value.strip("\n")
+
+    nomDuTir, dateDuTir = getInfosDuTir(ficNameAbsolute)
+
+    # utils.log_trace('   index : "'+indexName+'"')
+    # utils.log_trace("   ficName : {0}".format(ficName))
+    # utils.log_trace("      ficNameWithoutExt : {0}".format(ficNameWithoutExt))
+    # utils.log_trace("         nomDuTir : {0}".format(nomDuTir))
+    # utils.log_trace("         dateDuTir : {0}".format(dateDuTir))
+    # utils.log_trace("   index : {0}".format(indexName))
+    # utils.log_trace("   nbGlobal : {0}".format(nbGlobal))
+
+    if nomDuTir not in mapResume :
+        dictResume = {attributeName : value}
+        dictTir = {nomDuTir : dictResume}
+        utils.log_trace("Tir '{0}' n'existe pas encore => AJOUT des données : {1}".format(nomDuTir, dictTir));
+        mapResume.update(dictTir);
+    else :
+        dictTir = mapResume[nomDuTir]
+        utils.log_trace("Tir '{0}' existe déjà => recup des données pour UPDATE : {1}".format(nomDuTir, dictTir));
+        if attributeName not in dictTir :
+            dictResume = {attributeName : value}
+            utils.log_trace("Tir '{0}' n'existe pas encore => UPDATE des données : {1}".format(nomDuTir, dictTir));
+            # utils.log_trace("AVANT MAJ : existe pas")
+            dictTir.update(dictResume);
+            # utils.log_trace("APRES MAJ : {0}".format(mapIndex[indexName][nomDuTir]))            
+        else :
+            dictResume = dictTir[attributeName]
+            utils.log_trace(" +++++ ANOMALIE +++++ MotClé '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(attributeName, dictResume));
+
+#
+# Analyse et mise de côté des données d'un ligne d'un fichier
+#
+def ajouterLigneIndexDansMapIndex(line, ficNameAbsolute):
+    utils.log_trace('INDEX => ' + line, False)
 
     lineTab = line.split("|||")
     if len(lineTab) != 5 :
@@ -87,23 +149,15 @@ def ajouterLigneIndexDansMap(line, ficNameAbsolute):
     # contient le dernier carac de la ligne (retour chariot)
     nbGlobal = nbGlobal.strip("\n")
 
-    ficName = os.path.basename(ficNameAbsolute)
-    ficNameWithoutExt = ficName.replace(".res", "")
-
-    ficNameSplitTab = ficNameWithoutExt.split("_")
-    if len(ficNameSplitTab) != 2 :
-        raise Exception("Pb dans le formatage du nom du fichier => formatage accepté '<CHAINE>_<CHAINE FORMAT DATE YYYYMMDDHHmmSS>.res'".format(line))
-    
-    nomDuTir = ficNameSplitTab[0]
-    dateDuTir = ficNameSplitTab[1]
+    nomDuTir, dateDuTir = getInfosDuTir(ficNameAbsolute)
 
     # utils.log_trace('   index : "'+indexName+'"')
-    utils.log_trace("   ficName : {0}".format(ficName))
-    utils.log_trace("      ficNameWithoutExt : {0}".format(ficNameWithoutExt))
-    utils.log_trace("         nomDuTir : {0}".format(nomDuTir))
-    utils.log_trace("         dateDuTir : {0}".format(dateDuTir))
+    # utils.log_trace("   ficName : {0}".format(ficName))
+    # utils.log_trace("      ficNameWithoutExt : {0}".format(ficNameWithoutExt))
     utils.log_trace("   index : {0}".format(indexName))
     utils.log_trace("   nbGlobal : {0}".format(nbGlobal))
+    utils.log_trace("     nomDuTir : {0}".format(nomDuTir))
+    utils.log_trace("     dateDuTir : {0}".format(dateDuTir))
 
     if indexName not in mapIndex :
         dictTir = {nomDuTir : nbGlobal}
@@ -120,8 +174,8 @@ def ajouterLigneIndexDansMap(line, ficNameAbsolute):
             dictIndex.update(dictTir);
             # utils.log_trace("APRES MAJ : {0}".format(mapIndex[indexName][nomDuTir]))            
         else :
-            dictTir = dictIndex[dictTir]
-            utils.log_trace(" +++++ ANOMALIE +++++ Tir '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(indexName, dictTir));
+            dictTir = dictIndex[nomDuTir]
+            utils.log_trace(" +++++ ANOMALIE +++++ Tir '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(nomDuTir, dictTir));
 
 #
 # Affichage des données au format de sortie voulu
@@ -131,6 +185,7 @@ def ETAPE3_afficherDonnees(outputFormat):
 
     tirNames = {}
 
+    # récupération des noms des tirs pour affichage de l'entete
     for index_name in sorted(mapIndex.keys()) :
         # index_name = key
         dictTir = mapIndex[index_name]
@@ -149,6 +204,7 @@ def ETAPE3_afficherDonnees(outputFormat):
     # utils.log_trace('Affichage des noms des tirs TRIES (sous forme de liste)')
     # print lstTirNames
 
+    # Affichage de l'entete (init) - PARTIE 1/3
     if outputFormat is None :
         ligneout = "# NOM_INDEX"
     elif outputFormat == "md" :
@@ -156,7 +212,10 @@ def ETAPE3_afficherDonnees(outputFormat):
     elif outputFormat == "wiki" :
         ligneout = "|| "
 
+    # Affichage des noms des tirs dans l'entete - PARTIE 2/3
     for tir_name in lstTirNames :
+        tir_name = "{color:red}" + tir_name + "{color}\n" + str(mapResume[tir_name][CONST_CHAMPS_RESUME_DATE_TIR]) + "\n" + str(mapResume[tir_name][CONST_CHAMPS_RESUME_DUREE])
+        
         if outputFormat is None :
             ligneout = ligneout + ";" + tir_name
         elif outputFormat == "md" :
@@ -164,6 +223,7 @@ def ETAPE3_afficherDonnees(outputFormat):
         elif outputFormat == "wiki" :
             ligneout = ligneout + "||" + tir_name
 
+    # Affichage de l'entete (finalisation) - PARTIE 3/3
     if outputFormat is None :
         utils.log_retourchariot(ligneout)
     elif outputFormat == "md" :
@@ -175,6 +235,7 @@ def ETAPE3_afficherDonnees(outputFormat):
     elif outputFormat == "wiki" :
         ligneout = ligneout + "||\n"
 
+    # Affichage des données de chaque index
     for index_name in sorted(mapIndex.keys()) :
         # index_name = key
         dictTir = mapIndex[index_name]
