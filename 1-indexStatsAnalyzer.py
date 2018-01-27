@@ -6,6 +6,8 @@ import glob
 #import json
 #from pprint import pprint
 
+import re
+
 from bson import json_util
 
 import utils
@@ -56,6 +58,15 @@ def ETAPE1_validateDirParamAndGetFilesTab(dirName, paramName):
     utils.log_debug("Contrôle validité du répertoire [" + dirName + "]")
     if not os.path.isdir(dirName):
         utils.log_erreur("[" + dirName + "] n'est pas un répertoire")
+
+    # suppression du 1er et dernier slash pour que le basename puisse fonctionner correctement
+    dirName = re.sub("^/|/$", "", dirName)
+    baseDirName = os.path.basename(dirName)
+
+    # contrôle pattern du nom du répertoire
+    utils.log_debug("Contrôle pattern du nom du répertoire [" + baseDirName + "]")
+    if not re.match(".*_[0-9]{14}$", baseDirName) :
+        utils.log_erreur("Le nom du répertoire [" + baseDirName + "] ne respecte pas le pattern '<NOM_TIR>_<DATE_TIR_FORMAT_YYYYMMDDHHmmss>' (exemple : 'PROD-G_20180118135500')")
 
     # récupération des fichiers INDEXSTATS du répertoire passé en paramètre
     pattern_fic_extension = "*" + CONST_FILE_EXTENSION
