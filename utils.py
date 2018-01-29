@@ -47,6 +47,10 @@ def log_erreur(msg):
     log(msg + "\n")
     sys.exit(1)
 
+#
+# Formatage d'un nb (format numérique) dans une chaine facilement lisible par un humain
+# (Séparation des milliers, millions, ....)
+#
 def humanize_int(nb):
     # utilisation de la local US car les séparteurs des milliers est une virgule
     # => on la remplace ensuite par un espace
@@ -57,6 +61,21 @@ def humanize_int(nb):
     locale.resetlocale(locale.LC_ALL)
     return res
 
+#
+# Formatage d'un nb à partir d'une chaine (contenant un format numérique)
+#
+def humanize_str(nbStr):
+    nb = None
+    try:
+        nb = int(nbStr) 
+    except ValueError :
+        log_erreur("La chaine [{0}] n'est pas une valeur numérique".format(nbStr))
+    
+    return humanize_int(nb)
+
+#
+# Remplacement des types Mongo par un type parseable par du JSON
+#
 def mongoReplaceLongAndDate(line):
     #log_trace("line BEFORE_REPLACE= " + line)
 
