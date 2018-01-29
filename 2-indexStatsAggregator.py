@@ -214,14 +214,15 @@ def ETAPE3_afficherDonnees(outputFormat):
 
     # Affichage des noms des tirs dans l'entete - PARTIE 2/3
     for tir_name in lstTirNames :
-        tir_name = "{color:red}" + tir_name + "{color}\n" + str(mapResume[tir_name][CONST_CHAMPS_RESUME_DATE_TIR]) + "\n" + str(mapResume[tir_name][CONST_CHAMPS_RESUME_DUREE])
+        tir_date = str(mapResume[tir_name][CONST_CHAMPS_RESUME_DATE_TIR])
+        tir_duree = str(mapResume[tir_name][CONST_CHAMPS_RESUME_DUREE])
         
         if outputFormat is None :
-            ligneout = ligneout + ";" + tir_name
+            ligneout = ligneout + ";" + tir_name + " (" + tir_date + " /// " + tir_duree + ")"
         elif outputFormat == "md" :
-            ligneout = ligneout + " | " + tir_name
+            ligneout = ligneout + " | " + tir_name + "\n" + tir_date + "\n" + tir_duree
         elif outputFormat == "wiki" :
-            ligneout = ligneout + "||" + tir_name
+            ligneout = ligneout + "||" + "{color:#FE00ED}" + tir_name + "{color}\n{color:#2D47EF}" + tir_date + "\n" + tir_duree + "{color}"
 
     # Affichage de l'entete (finalisation) - PARTIE 3/3
     if outputFormat is None :
@@ -245,6 +246,8 @@ def ETAPE3_afficherDonnees(outputFormat):
         elif outputFormat == "md" :
             ligneout = ligneout + index_name
         elif outputFormat == "wiki" :
+            # remplacement des "_" pour ne pas avoir le style "italic" actif dans Confluence
+            index_name = index_name.replace("_", "\\_")
             ligneout = ligneout + "|" + index_name
 
         for tir_name in lstTirNames :
