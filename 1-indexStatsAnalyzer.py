@@ -230,7 +230,11 @@ def getDureeStats(dateTir, dateMin) :
     diffHeures = diffSec / 3600
     diffMinutes = diffSec % 3600 / 60
 
-    return str(diffDays) + " jrs " + str(diffHeures) + "h" + str(diffMinutes)
+    dureeJrs = ""
+    if diffDays > 0 :
+        dureeJrs = str(diffDays) + " jrs "
+
+    return dureeJrs + str(diffHeures) + "h" + str(diffMinutes)
 
 #
 # Affichage des données aggrégées des tous les fichiers

@@ -280,7 +280,7 @@ def ETAPE4_afficherDonnees(outputFormat):
         elif outputFormat == "md" :
             ligneout = ligneout + " | " + tir_name + "\n" + tir_date + "\n" + tir_duree
         elif outputFormat == "wiki" :
-            ligneout = ligneout + "||" + "{color:#FE00ED}" + tir_name + "{color}\n{color:#2D47EF}" + tir_date + "\n" + tir_duree + "{color}"
+            ligneout = ligneout + "||" + "{color:#FE00ED}" + tir_name + "{color}\n{color:#2D47EF}" + tir_date + "{color}\n{color:#00D44E}" + tir_duree + "{color}"
 
     # Affichage de l'entete (finalisation) - PARTIE 3/3
     if outputFormat is None :
