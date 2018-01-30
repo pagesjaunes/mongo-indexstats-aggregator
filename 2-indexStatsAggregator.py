@@ -31,15 +31,22 @@ mapShoot = {}
 nomDernierTirProd = None
 CONST_MOT_CLE_PROD_DANS_NOM_TIR = "PROD"
 
-# map des resumes et de meurs donnees - structure :
+# map des resumes et de leurs donnees - structure :
 #   - CLE : nom_tir
 #   - VALUE : mapAttribut
-#       - CLE : attribut (ex : )
+#       - CLE : attribut (cf constante ci-dessous)
 #       - VALUE : valeur de l'attribut
 mapResume = {}
 
+# Constantes pour le stcokage des attributs et de leur valeur dans la mapResume
 CONST_CHAMPS_RESUME_DATE_TIR = "%%%RESUME%%%date_tir"
 CONST_CHAMPS_RESUME_DUREE = "%%%RESUME%%%duree"
+CONST_CHAMPS_RESUME_NB_INDEXS_NON_UTILISES = "%%%RESUME%%%nb_indexs_non_utilises"
+CONST_CHAMPS_RESUME_NB_INDEXS_TRES_PEU_UTILISES = "%%%RESUME%%%nb_indexs_tres_peu_utilises_LT10"
+CONST_CHAMPS_RESUME_NB_INDEXS_PEU_UTILISES = "%%%RESUME%%%nb_indexs_peu_utilises_LT100"
+CONST_CHAMPS_RESUME_NB_INDEXS_TRES_UTILISES = "%%%RESUME%%%nb_indexs_tres_utilises_GE100000"
+CONST_CHAMPS_RESUME_NB_INDEXS_TOTAL = "%%%RESUME%%%nb_indexs"
+
 
 #
 # Validation du paramètre "output"
@@ -49,6 +56,7 @@ def validateOutParam(outputFormat, paramName):
     if outputFormat is not None :
         if outputFormat != "md" and outputFormat != "wiki" :
             utils.log_erreur(paramName+' NON reconnue (cf help)\n')
+
 
 #
 # Récupération de la liste des fichiers à aggréger en validantle paramètre "dirName"
@@ -67,6 +75,10 @@ def ETAPE1_validateDirParamAndGetListResFiles(dirName, paramName):
 
     return ficTab
 
+
+#
+# Calcul du dernier tir de PROD (à des fins de mise en forme particulière pour un index supprimé)
+#
 def ETAPE2_calculateDernierTirProd(ficNameTab) :
     utils.log_debug('Calcul du dernier tir de PROD avec le(s) ' + str(len(ficNameTab)) + ' fichier(s) trouvés')
 
@@ -129,7 +141,7 @@ def ETAPE3_remplirMapIndexAvecListeFichiers(ficNameTab):
 
 
 #
-# Récupération des infos d'un tir à partir de son nom de fichier
+# Récupération des infos (nom et date) d'un tir à partir de son nom de fichier
 #
 def getInfosDuTir(ficNameAbsolute) :
     ficName = os.path.basename(ficNameAbsolute)
@@ -144,8 +156,9 @@ def getInfosDuTir(ficNameAbsolute) :
 
     return nomDuTir, datetime.datetime.strptime(dateDuTir, "%Y%m%d%H%M%S")
 
+
 #
-# Analyse et mise de côté des données d'un ligne d'un fichier
+# Analyse et mise de côté des données d'une ligne de type RESUME d'un fichier
 #
 def ajouterLigneIndexDansMapResume(line, nomDuTir):
     utils.log_trace('RESUME => ' + line, False)
@@ -157,14 +170,15 @@ def ajouterLigneIndexDansMapResume(line, nomDuTir):
     attributeName = lineTab[0]
     value = lineTab[1]
 
+    # suppression du retour chariot de fin de ligne
     value = value.strip("\n")
 
-    if nomDuTir not in mapResume :
+    if nomDuTir not in mapResume : # init du tir si inexistant
         dictResume = {attributeName : value}
         dictTir = {nomDuTir : dictResume}
         utils.log_trace("Tir '{0}' n'existe pas encore => AJOUT des données : {1}".format(nomDuTir, dictTir));
         mapResume.update(dictTir);
-    else :
+    else : # MAJ du tir existant
         dictTir = mapResume[nomDuTir]
         utils.log_trace("Tir '{0}' existe déjà => recup des données pour UPDATE : {1}".format(nomDuTir, dictTir));
         if attributeName not in dictTir :
@@ -177,13 +191,12 @@ def ajouterLigneIndexDansMapResume(line, nomDuTir):
             dictResume = dictTir[attributeName]
             utils.log_trace(" +++++ ANOMALIE +++++ MotClé '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(attributeName, dictResume));
 
+
 #
 # Analyse et mise de côté des données d'un ligne d'un fichier
 #
 def ajouterLigneIndexDansMapIndex(line, nomDuTir):
     utils.log_trace('INDEX => ' + line, False)
-
-    # global lstIndexsSupprimeDuDernierTirProd
 
     lineTab = line.split("|||")
     if len(lineTab) != 5 :
@@ -195,12 +208,13 @@ def ajouterLigneIndexDansMapIndex(line, nomDuTir):
     # contient le dernier carac de la ligne (retour chariot)
     nbGlobal = nbGlobal.strip("\n")
 
-    if indexName not in mapIndex :
+    # mise de côté des données de l'index (du nb pour un tir donné)
+    if indexName not in mapIndex : # init de l'index si inexistant
         dictTir = {nomDuTir : nbGlobal}
         dictIndex = {indexName : dictTir}
         utils.log_trace("Index '{0}' n'existe pas encore => AJOUT des données : {1}".format(indexName, dictIndex));
         mapIndex.update(dictIndex);
-    else :
+    else : # MAJ de l'index existant
         dictIndex = mapIndex[indexName]
         utils.log_trace("Index '{0}' existe déjà => recup des données pour UPDATE : {1}".format(indexName, dictIndex));
         if nomDuTir not in dictIndex :
@@ -213,6 +227,7 @@ def ajouterLigneIndexDansMapIndex(line, nomDuTir):
             dictTir = dictIndex[nomDuTir]
             utils.log_trace(" +++++ ANOMALIE +++++ Tir '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(nomDuTir, dictTir));
 
+    # mise de côté des données de l'index dans la map des tirs (pour pouvoir repérer si un index est présent ou non sur un tir)
     if nomDuTir not in mapShoot :
         lstIndex = [indexName]
         dictTir = {nomDuTir : lstIndex}
@@ -224,6 +239,7 @@ def ajouterLigneIndexDansMapIndex(line, nomDuTir):
         if indexName not in lstIndex :
             lstIndex.append(indexName);
             utils.log_trace("Index '{0}' n'existe pas encore => UPDATE des données : {1}".format(indexName, lstIndex));
+
 
 #
 # Calcul du nom d'un index à destination d'un affichage de type WIKI (style)
@@ -237,31 +253,9 @@ def getIndexNameForWikiFormat(index_name, isIndexSupprimes, isReplaceUnderscore)
     return res
 
 #
-# Affichage des données au format de sortie voulu
+# Affichage des données d'entete pour les indexs
 #
-def ETAPE4_afficherDonnees(outputFormat):
-    utils.log_debug("Affichage des donnees au format {0}".format("CSV" if outputFormat is None else "HTML"))
-
-    tirNames = {}
-
-    # récupération des noms des tirs pour affichage de l'entete
-    for index_name in sorted(mapIndex.keys()) :
-        # index_name = key
-        dictTir = mapIndex[index_name]
-
-        utils.log_trace("{0}".format(index_name))
-
-        for tir_name in sorted(dictTir.keys()) :
-            nb_global = dictTir[tir_name]
-
-            dictTirNames = {tir_name : ""}
-            tirNames.update(dictTirNames)
-
-            utils.log_trace("   {0} - {1}".format(tir_name, nb_global))
-    
-    lstTirNames = sorted(tirNames.keys())
-    # utils.log_trace('Affichage des noms des tirs TRIES (sous forme de liste)')
-
+def afficherDonneesIndexEntete(outputFormat, lstTirNames) :
     # Affichage de l'entete (init) - PARTIE 1/3
     if outputFormat is None :
         ligneout = "# NOM_INDEX"
@@ -294,48 +288,175 @@ def ETAPE4_afficherDonnees(outputFormat):
     elif outputFormat == "wiki" :
         ligneout = ligneout + "||\n"
 
+    return ligneout
+
+#
+# Affichage des données des indexs
+#
+def afficherDonneesIndex(ligneout, outputFormat, index_name, lstTirNames) :
+
+    # index_name = key
+    dictTir = mapIndex[index_name]
+    # index_name_before = index_name
+    isIndexSupprimes = False
+    if index_name not in mapShoot[nomDernierTirProd] :
+        isIndexSupprimes = True
+
+    # Affichage du nom de l'index
+    if outputFormat is None :
+        ligneout = index_name
+    elif outputFormat == "md" :
+        ligneout = ligneout + index_name
+    elif outputFormat == "wiki" :
+        ligneout = ligneout + "|" + getIndexNameForWikiFormat(index_name, isIndexSupprimes, True)
+
+    # Affichage des dénombrements
+    for tir_name in lstTirNames :
+        nb_global = "/"
+        try:
+            nb_global = dictTir[tir_name]
+        except KeyError:
+            utils.log_trace("   Pas de tir '{0}' trouvé pour l'index '{1}'".format(tir_name, index_name))
+
+        if nb_global != "/" :
+            nb_global = utils.humanize_str(nb_global)
+
+        if outputFormat is None :
+            ligneout = ligneout + ";" + nb_global
+        elif outputFormat == "md" :
+            ligneout = ligneout + " | " + nb_global
+        elif outputFormat == "wiki" :
+            ligneout = ligneout + "|" + getIndexNameForWikiFormat(nb_global, isIndexSupprimes, False)
+
+    # Affichage de la fin des données de l'index courant
+    if outputFormat is None :
+        utils.log_retourchariot(ligneout)
+    elif outputFormat == "md" :
+        ligneout = ligneout + "\n"
+    elif outputFormat == "wiki" :
+        ligneout = ligneout + "|\n"
+
+    return ligneout
+
+#
+# Affichage des données détaillées des indexs au format de sortie voulu
+#
+def ETAPE4a_afficherDonneesIndexs(outputFormat, lstTirNames):
+    utils.log_debug("Affichage des donnees détaillées sur les indexs au format {0}".format(outputFormat))
+
+    # Affichage des données d'entete
+    ligneout = afficherDonneesIndexEntete(outputFormat, lstTirNames)
+
     # Affichage des données de chaque index
     for index_name in sorted(mapIndex.keys()) :
-        # index_name = key
-        dictTir = mapIndex[index_name]
-        # index_name_before = index_name
-        isIndexSupprimes = False
-        if index_name not in mapShoot[nomDernierTirProd] :
-            isIndexSupprimes = True
+        ligneout = afficherDonneesIndex(ligneout, outputFormat, index_name, lstTirNames)
 
-        # Affichage du nom de l'index
-        if outputFormat is None :
-            ligneout = index_name
-        elif outputFormat == "md" :
-            ligneout = ligneout + index_name
-        elif outputFormat == "wiki" :
-            ligneout = ligneout + "|" + getIndexNameForWikiFormat(index_name, isIndexSupprimes, True)
+    # Finalisation affichage
+    if outputFormat == "md" or outputFormat == "wiki" :
+        utils.log(ligneout)
 
-        # Affichage des dénombrements
-        for tir_name in lstTirNames :
-            nb_global = "/"
-            try:
-                nb_global = dictTir[tir_name]
-            except KeyError:
-                utils.log_trace("   Pas de tir '{0}' trouvé pour l'index '{1}'".format(tir_name, index_name))
 
-            if nb_global != "/" :
-                nb_global = utils.humanize_str(nb_global)
-            if outputFormat is None :   
-                ligneout = ligneout + ";" + nb_global
-            elif outputFormat == "md" :    
-                ligneout = ligneout + " | " + nb_global
-            elif outputFormat == "wiki" :
-                ligneout = ligneout + "|" + getIndexNameForWikiFormat(nb_global, isIndexSupprimes, False)
+#
+# Affichage des données d'entete pour les résumés
+#
+def afficherDonneesResumeEntete(outputFormat, lstTirNames) :
+    if outputFormat is None :
+        ligneout = "# TIR; Date tir; Durée tir; nb indexs NON utilisés; nb indexs TRES PEU utilisés (<10); nb indexs PEU utilisés (<100); nb indexs TRES utilisés (>= 100 000); nb total indexs"
+        utils.log_retourchariot(ligneout)
+    elif outputFormat == "md" :
+        ligneout = "Tir | Date tir | Durée tir | nb indexs\nNON utilisés | nb indexs TRES PEU\nutilisés (<10) | nb indexs PEU\nutilisés (<100) | nb indexs TRES\nutilisés (>= 100 000) | nb total indexs\n"
+        ligneout = ligneout + "--- | --- | --- | --- | --- | --- | --- | ---\n"
+    elif outputFormat == "wiki" :
+        ligneout = "|| Tir || Date tir || Durée tir || nb indexs\nNON utilisés || nb indexs TRES PEU\nutilisés (<10) || nb indexs PEU\nutilisés (<100) || nb indexs TRES\nutilisés (>= 100 000) || nb total indexs ||\n"
 
-        # Affichage de la fin des données de l'index courant
-        if outputFormat is None :
-            utils.log_retourchariot(ligneout)
-        elif outputFormat == "md" :
-            ligneout = ligneout + "\n"
-        elif outputFormat == "wiki" :
-            ligneout = ligneout + "|\n"
-        
+    return ligneout
+
+
+#
+# Affichage des données des résumés
+#
+def afficherDonneesTir(ligneout, outputFormat, tir_name) :
+    # index_name = key
+    dictResume = mapResume[tir_name]
+
+    # Affichage du nom du tir
+    if outputFormat is None :
+        ligneout = tir_name
+    elif outputFormat == "md" :
+        ligneout = ligneout + tir_name
+    elif outputFormat == "wiki" :
+        ligneout = ligneout + "|" + tir_name
+
+    # vérification que le tir existe dansla map Resume
+    try:
+        dictTir = mapResume[tir_name]
+    except KeyError:
+        raise Exception("Pas de tir '{0}' trouvé dans les Résumés (alors que devrait être là ! => BUG ?!)".format(tir_name))
+
+    # Récupération des valeurs des attributs avec contrôle d'existence
+    try:
+        date = str(dictTir[CONST_CHAMPS_RESUME_DATE_TIR])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_DATE_TIR, tir_name))
+    try:
+        duree = str(dictTir[CONST_CHAMPS_RESUME_DUREE])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_DUREE, tir_name))
+    try:
+        nb_indexs_non_utilises = str(dictTir[CONST_CHAMPS_RESUME_NB_INDEXS_NON_UTILISES])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_NB_INDEXS_NON_UTILISES,tir_name))
+    try:
+        nb_indexs_tres_peu_utilises = str(dictTir[CONST_CHAMPS_RESUME_NB_INDEXS_TRES_PEU_UTILISES])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_NB_INDEXS_TRES_PEU_UTILISES,tir_name))
+    try:
+        nb_indexs_peu_utilises = str(dictTir[CONST_CHAMPS_RESUME_NB_INDEXS_PEU_UTILISES])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_NB_INDEXS_PEU_UTILISES,tir_name))
+    try:
+        nb_indexs_tres_utilises = str(dictTir[CONST_CHAMPS_RESUME_NB_INDEXS_TRES_UTILISES])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_NB_INDEXS_TRES_UTILISES,tir_name))
+    try:
+        nb_indexs_total = str(dictTir[CONST_CHAMPS_RESUME_NB_INDEXS_TOTAL])
+    except KeyError:
+        raise Exception("Pas de valeur trouvée dans les Résumés pour l'attribut '{0}' et pour le tir '{1}' (alors que devrait être là ! => BUG ?!)".format(CONST_CHAMPS_RESUME_NB_INDEXS_TOTAL,tir_name))
+
+    separateur = ";" # CSV par défaut
+    if outputFormat == "md" :
+        separateur = " | "
+    elif outputFormat == "wiki" :
+        separateur = "|"
+
+    ligneout = ligneout + separateur + date + separateur + duree + separateur+ nb_indexs_non_utilises + separateur + nb_indexs_tres_peu_utilises
+    ligneout = ligneout + separateur + nb_indexs_peu_utilises + separateur + nb_indexs_tres_utilises + separateur + nb_indexs_total
+
+    # Affichage de la fin des données de l'index courant
+    if outputFormat is None :
+        utils.log_retourchariot(ligneout)
+    elif outputFormat == "md" :
+        ligneout = ligneout + "\n"
+    elif outputFormat == "wiki" :
+        ligneout = ligneout + "|\n"
+
+    return ligneout
+
+
+#
+# Affichage des données détaillées des indexs au format de sortie voulu
+#
+def ETAPE4b_afficherDonneesResumesTir(outputFormat, lstTirNames):
+    utils.log_debug("Affichage des donnees de Résumé par tir au format {0}".format(outputFormat))
+
+    # Affichage des données d'entete
+    ligneout = afficherDonneesResumeEntete(outputFormat, lstTirNames)
+
+    # Affichage des données de chaque index
+    for tir_name in sorted(lstTirNames) :
+        ligneout = afficherDonneesTir(ligneout, outputFormat, tir_name)
+
+    # Finalisation affichage
     if outputFormat == "md" or outputFormat == "wiki" :
         utils.log(ligneout)
 
@@ -350,6 +471,7 @@ def main():
     parser = argparse.ArgumentParser(description='Script Python (2.7.X) permettant d\'aggreger les donnees \'indexStats\' de tous les noeuds d\'un cluster mongo (3 noeuds = 1 PRIMARY et 2 SECONDARY)')
     parser.add_argument('-d', '--dir', help='Repertoire contenant le resultat minimifié de la commande \'indexStats\' du mongo')
     parser.add_argument('-o', '--out', help='Type de sortie du résultat (par défaut : "csv" / autres possibles : "md" (MarkDown), "wiki" (WIKI Confluence - "Balise WIKI"))')
+    parser.add_argument('-r', '--resume', help='Afficher les données de résumé', action='store_true')
     parser.add_argument('--debug', help='Afficher log de debug dans la console', action='store_true')
     parser.add_argument('--trace', help='Afficher log de debug et trace dans la console', action='store_true')
     
@@ -370,8 +492,13 @@ def main():
     # lecture des fichiers et mise de côté des données
     ETAPE3_remplirMapIndexAvecListeFichiers(ficTab)
 
-    # Affichage des données
-    ETAPE4_afficherDonnees(args.out)
-    
+    lstTirNames = sorted(mapShoot.keys())
+
+    # Affichage des données détaillées sur les indexs
+    if not args.resume :
+        ETAPE4a_afficherDonneesIndexs(args.out, lstTirNames)
+    else :
+        ETAPE4b_afficherDonneesResumesTir(args.out, lstTirNames)
+
 if __name__ == '__main__':
     main()
