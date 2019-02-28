@@ -7,7 +7,8 @@ Cet outil contient 2 scripts python permettant de faire :
 
 Pré-requis
 ---
-- python 2.7.X
+- python 2.7.X + installation des dépendances (`pip install -r requirements.txt`)
+    - bonne pratique : travailler dans un environnement python isolé (`virtualenv`) : utiliser `workon`, `mkvirtualenv`, `lsvirtualenv`, ...
 - 1 fichier de résultat brut par noeud du cluster mongo issu de la commande suivante :
     ``db.MA_COLLECTION.aggregate( [ { $indexStats: { } } ] )``
     - ATTENTION : il se peut qu'il y ait plusieurs pages de résultats (ATTENTION au ``Type "it" for more``)
@@ -23,3 +24,15 @@ Pré-requis
         - ``rs.slaveOk(false)``
 - fortement conseillé : lancé chaque script avec l'option ``--help`` pour bien comprendre ce qui est possible de faire
 
+TODOs
+---
+- tech
+    - modulariser les scripts => découpage en module (cf mongo-injector)
+    - utiliser un fichier requirements (`pip install -r requirements.txt`)
+    - python 3 avec des classes
+- evol scripts :
+    - trier index : par nom, pas volumétrie
+    - possibilité plusieurs slaves (+3 maintenant)
+    - rendu wiki : trie inverse suivant date du tir (les plus récent d'abord)
+    - fusionner les 2 scripts
+    - gestion des stats de volumétrie physique (autre infos données dans KATS)
