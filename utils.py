@@ -16,7 +16,8 @@ def set_debug_level(isDebugOrTraceEnabled):
 def log_debug(msg):
     global isDebug
     if isDebug :
-        msg = "--- DEBUG --- " + msg + "\n"
+        #msg = "--- DEBUG --- " + msg + "\n"
+        msg = '{:-^17} {}\n'.format(' DEBUG ', msg) # DEBUG aligné au centre + remplaissage à droite et à gauche de "-" 'pour avoir au max 17 carac
         sys.stdout.write(msg)
         sys.stdout.flush()
 
@@ -28,7 +29,8 @@ def set_trace_level(isTraceEnabled):
 def log_trace(msg, withEndOfLine=True):
     global isTrace
     if isTrace :
-        msg = "--- TRACE --- " + msg
+        # msg = "--- TRACE --- " + msg
+        msg = '{:-^17} '.format(' TRACE ') # DEBUG aligné au centre + remplaissage à droite et à gauche de "-" 'pour avoir au max 17 carac
         if withEndOfLine :
             msg = msg + "\n"
         sys.stdout.write(msg)

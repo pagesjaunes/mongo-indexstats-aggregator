@@ -1,4 +1,4 @@
-# -*-coding:UTF-8 -*
+# -*- coding:UTF-8 -*-
 
 import argparse
 import os
@@ -32,25 +32,30 @@ CONST_CHAMPS_NB = "nb"
 CONST_CHAMPS_DATE_DEBUT = "date_debut"
 CONST_CHAMPS_NB_GLOBAL = "nb_global"
 
-#
-# Calcul du nom du noeud à partir d'un objet fichier
-#
+
 def getNodeNameFromFile(file):
+    """
+    Calcul du nom du noeud à partir d'un objet fichier
+    """
     filename = os.path.basename(file.name)
     node_name = filename
     if node_name.endswith(CONST_FILE_EXTENSION) :
         node_name = node_name.rsplit('.', 1)[0]
     return node_name
 
+
 def getBaseDirName(dirName) :
     dirName = re.sub("^/|/$", "", dirName)
     baseDirName = os.path.basename(dirName)
     return baseDirName
 
-#
-# Récupération de la liste des fichiers INDEXSTATS d'un répertoire (tout en validant le paramètre "dirName")
-#
+
 def ETAPE1_validateDirParamAndGetFilesTab(dirName, paramName):
+    """
+    Récupération de la liste des fichiers INDEXSTATS d'un répertoire 
+    (tout en validant le paramètre "dirName")
+    """
+    
     utils.log_debug("==> ETAPE1_validateDirParamAndGetFilesTab")
 
     # contrôle paramètre obligatoire correspondant au répertoire dans lequel sont stockés les fichiers INDEXSTATS
@@ -95,10 +100,11 @@ def ETAPE1_validateDirParamAndGetFilesTab(dirName, paramName):
 
     return lstFicOpened
 
-#
-# Récupération des données d'un fichier
-#
+
 def ETAPE2_remplirMapIndexAvecFichier(filesTab):
+    """
+    Récupération des données d'un fichier
+    """
     
     utils.log_debug("==> ETAPE2_remplirMapIndexAvecFichier")
 
@@ -136,10 +142,11 @@ def ETAPE2_remplirMapIndexAvecFichier(filesTab):
         # fermeture du fichier INDEXSTAT préalablement ouvert
         file.close()
 
-#
-# Affichage des données d'entête
-#
+
 def ETAPE3_afficherDonneesEntete(filesTab) :
+    """
+    Affichage des données d'entête
+    """
     
     utils.log_debug("==> ETAPE3_afficherDonneesEntete")
     
@@ -166,10 +173,12 @@ def ETAPE3_afficherDonneesEntete(filesTab) :
     if not args.miniprint:
         utils.log_retourchariot("")
 
-#
-# Affichage des données aggrégées d'un noeud mongo
-#
+
 def recupererDonneesDuNoeud(index_name, noeud, line_prettyprint):
+    """
+    Affichage des données aggrégées d'un noeud mongo
+    """
+
     utils.log_debug("Récupération des données de l'index ["+ index_name + "] pour le noeud [" + noeud + "]")
 
     if mapIndex[index_name][noeud] :
@@ -194,10 +203,12 @@ def recupererDonneesDuNoeud(index_name, noeud, line_prettyprint):
 
     return line_prettyprint
 
-#
-# Méthode utilitaire d'affichage colorisée dans la console (si option active)
-#
+
 def coloriserChaineAAfficher(chaine, type):
+    """
+    Méthode utilitaire d'affichage colorisée dans la console (si option active)
+    """
+
     if args.color:
         if type=="ERREUR":
             return "\033[37;41;5m "+chaine+" \033[0m"
@@ -206,6 +217,7 @@ def coloriserChaineAAfficher(chaine, type):
         if type=="INFO":
             return "\033[46;1m "+chaine+" \033[0m"
     return chaine
+
 
 def getDateTir(dirName) :
 
@@ -220,25 +232,29 @@ def getDateTir(dirName) :
 
     return dateTir
 
+
 def getDureeStats(dateTir, dateMin) :
     diff = dateTir - dateMin
     diffDays = diff.days
     diffSec = diff.seconds
 
-    diffHeures = diffSec / 3600
-    diffMinutes = diffSec % 3600 / 60
+    diffHeures = diffSec // 3_600
+    diffMinutes = (diffSec % 3_600) // 60
 
-    dureeJrs = ""
+    dureeJrs = "0"
     if diffDays > 0 :
-        dureeJrs = str(diffDays) + " jrs "
+        #dureeJrs = str(diffDays) + " jrs "
+        dureeJrs = str(diffDays)
 
-    return dureeJrs + str(diffHeures) + "h" + str(diffMinutes)
+    #return dureeJrs + str(diffHeures) + "h" + str(diffMinutes)
+    return f"{dureeJrs} jrs {diffHeures} h {diffMinutes}"
 
-#
-# Affichage des données aggrégées des tous les fichiers
-#
+
 def ETAPE4_afficherDonnees(filesTab, dirName):
-    
+    """
+    Affichage des données aggrégées des tous les fichiers
+    """
+        
     utils.log_debug("==> ETAPE4_afficherDonnees")
 
     nbIndex=0
@@ -324,25 +340,25 @@ def ETAPE4_afficherDonnees(filesTab, dirName):
     # Affichage du dénombrement des indexs (par seuil) suivant le type d'affichage
     if not args.miniprint :
         utils.log_retourchariot("")
-        utils.log_retourchariot("NB indexs analyses : " + str(nbIndex))
+        utils.log_retourchariot(f"NB indexs analyses : {nbIndex}")
         utils.log_retourchariot("NB indexs TRES utilises (>= 100 000) : " + coloriserChaineAAfficher(str(nbIndexTresUtilises), "INFO"))
         utils.log_retourchariot("NB indexs PEU utilises (< 100) : " + coloriserChaineAAfficher(str(nbIndexPeuUtilises), "WARN"))
         utils.log_retourchariot("NB indexs TRES PEU utilises (< 10) : " + coloriserChaineAAfficher(str(nbIndexTresPeuUtilises), "WARN"))
         utils.log_retourchariot("NB indexs NON utilises (= 0) : " + coloriserChaineAAfficher(str(nbIndexNonUtilises), "ERREUR"))
-        utils.log_retourchariot("Date indexs MIN : " + str(dateMin))
-        utils.log_retourchariot("Date indexs MAX : " + str(dateMax))
-        utils.log_retourchariot("Date Tir : " + str(dateTir))
-        utils.log_retourchariot("Durée (TIR_MIN) : " + str(duree)+"\n")
+        utils.log_retourchariot(f"Date indexs MIN : {dateMin}")
+        utils.log_retourchariot(f"Date indexs MAX : {dateMax}")
+        utils.log_retourchariot(f"Date Tir : {dateTir}")
+        utils.log_retourchariot(f"Durée (TIR_MIN) : {duree}\n")
     else :
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs|||" + str(nbIndex))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_utilises_GE100000|||" + str(nbIndexTresUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_peu_utilises_LT100|||" + str(nbIndexPeuUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_tres_peu_utilises_LT10|||" + str(nbIndexTresPeuUtilises))
-        utils.log_retourchariot("%%%RESUME%%%nb_indexs_non_utilises|||" + str(nbIndexNonUtilises))
-        utils.log_retourchariot("%%%RESUME%%%date_indexs_min|||" + str(dateMin))
-        utils.log_retourchariot("%%%RESUME%%%date_indexs_max|||" + str(dateMax))
-        utils.log_retourchariot("%%%RESUME%%%date_tir|||" + str(dateTir))
-        utils.log_retourchariot("%%%RESUME%%%duree|||" + str(duree))
+        utils.log_retourchariot(f"%%%RESUME%%%nb_indexs|||{nbIndex}")
+        utils.log_retourchariot(f"%%%RESUME%%%nb_indexs_tres_utilises_GE100000|||{nbIndexTresUtilises}")
+        utils.log_retourchariot(f"%%%RESUME%%%nb_indexs_peu_utilises_LT100|||{nbIndexPeuUtilises}")
+        utils.log_retourchariot(f"%%%RESUME%%%nb_indexs_tres_peu_utilises_LT10|||{nbIndexTresPeuUtilises}")
+        utils.log_retourchariot(f"%%%RESUME%%%nb_indexs_non_utilises|||{nbIndexNonUtilises}")
+        utils.log_retourchariot(f"%%%RESUME%%%date_indexs_min|||{dateMin}")
+        utils.log_retourchariot(f"%%%RESUME%%%date_indexs_max|||{dateMax}")
+        utils.log_retourchariot(f"%%%RESUME%%%date_tir|||{dateTir}")
+        utils.log_retourchariot(f"%%%RESUME%%%duree|||{duree}")
 
 
 def main(): 

@@ -1,4 +1,4 @@
-# -*-coding:UTF-8 -*
+# -*- coding:UTF-8 -*-
 
 import argparse
 import os
@@ -48,20 +48,22 @@ CONST_CHAMPS_RESUME_NB_INDEXS_TRES_UTILISES = "%%%RESUME%%%nb_indexs_tres_utilis
 CONST_CHAMPS_RESUME_NB_INDEXS_TOTAL = "%%%RESUME%%%nb_indexs"
 
 
-#
-# Validation du paramètre "output"
-#
 def validateOutParam(outputFormat, paramName):
+    """
+    Validation du paramètre "output"
+    """
+
     utils.log_debug('Controle parametre obligatoire "'+paramName+'"')
     if outputFormat is not None :
         if outputFormat != "md" and outputFormat != "wiki" :
             utils.log_erreur(paramName+' NON reconnue (cf help)\n')
 
 
-#
-# Récupération de la liste des fichiers à aggréger en validantle paramètre "dirName"
-#
 def ETAPE1_validateDirParamAndGetListResFiles(dirName, paramName):
+    """
+    Récupération de la liste des fichiers à aggréger en validantle paramètre "dirName"
+    """
+
     utils.log_debug('Controle parametre obligatoire "'+paramName+'"')
     if dirName is None:
         utils.log_erreur(paramName+' est obligatoire\n')
@@ -76,10 +78,12 @@ def ETAPE1_validateDirParamAndGetListResFiles(dirName, paramName):
     return ficTab
 
 
-#
-# Calcul du dernier tir de PROD (à des fins de mise en forme particulière pour un index supprimé)
-#
 def ETAPE2_calculateDernierTirProd(ficNameTab) :
+    """
+    Calcul du dernier tir de PROD
+    (à des fins de mise en forme particulière pour un index supprimé)
+    """
+
     utils.log_debug('Calcul du dernier tir de PROD avec le(s) ' + str(len(ficNameTab)) + ' fichier(s) trouvés')
 
     dateDernierTirProd = None
@@ -109,10 +113,11 @@ def ETAPE2_calculateDernierTirProd(ficNameTab) :
             utils.log_erreur("Erreur durant l'ouverture du fichier [{0}] => I/O error({1}): {2}".format(ficName, e.errno, e.strerror))
 
 
-#
-# Récupération des données des fichiers avec filtrage des lignes à analysées
-#
 def ETAPE3_remplirMapIndexAvecListeFichiers(ficNameTab):
+    """
+    Récupération des données des fichiers avec filtrage des lignes à analysées
+    """
+
     utils.log_debug('Remplissage de la MAP avec le(s) ' + str(len(ficNameTab)) + ' fichier(s) trouvés')
 
     for ficName in ficNameTab : 
@@ -140,10 +145,11 @@ def ETAPE3_remplirMapIndexAvecListeFichiers(ficNameTab):
             utils.log_erreur("Erreur durant l'ouverture du fichier [{0}] => I/O error({1}): {2}".format(ficName, e.errno, e.strerror))
 
 
-#
-# Récupération des infos (nom et date) d'un tir à partir de son nom de fichier
-#
 def getInfosDuTir(ficNameAbsolute) :
+    """
+    Récupération des infos (nom et date) d'un tir à partir de son nom de fichier
+    """
+
     ficName = os.path.basename(ficNameAbsolute)
     ficNameWithoutExt = ficName.replace(".res", "")
 
@@ -157,10 +163,11 @@ def getInfosDuTir(ficNameAbsolute) :
     return nomDuTir, datetime.datetime.strptime(dateDuTir, "%Y%m%d%H%M%S")
 
 
-#
-# Analyse et mise de côté des données d'une ligne de type RESUME d'un fichier
-#
 def ajouterLigneIndexDansMapResume(line, nomDuTir):
+    """
+    Analyse et mise de côté des données d'une ligne de type RESUME d'un fichier
+    """
+
     utils.log_trace('RESUME => ' + line, False)
 
     lineTab = line.split("|||")
@@ -192,10 +199,11 @@ def ajouterLigneIndexDansMapResume(line, nomDuTir):
             utils.log_trace(" +++++ ANOMALIE +++++ MotClé '{0}' existe déjà => PAS de UPDATE : PAS NORMAL ! => {1}".format(attributeName, dictResume));
 
 
-#
-# Analyse et mise de côté des données d'un ligne d'un fichier
-#
 def ajouterLigneIndexDansMapIndex(line, nomDuTir):
+    """
+    Analyse et mise de côté des données d'un ligne d'un fichier
+    """
+
     utils.log_trace('INDEX => ' + line, False)
 
     lineTab = line.split("|||")
@@ -241,10 +249,11 @@ def ajouterLigneIndexDansMapIndex(line, nomDuTir):
             utils.log_trace("Index '{0}' n'existe pas encore => UPDATE des données : {1}".format(indexName, lstIndex));
 
 
-#
-# Calcul du nom d'un index à destination d'un affichage de type WIKI (style)
-#
 def getIndexNameForWikiFormat(index_name, isIndexSupprimes, isReplaceUnderscore) :
+    """
+    Calcul du nom d'un index à destination d'un affichage de type WIKI (style)
+    """
+
     res = index_name
     if isReplaceUnderscore and res.startswith("_") :
         res = res.replace("_", "\\_")
@@ -252,10 +261,12 @@ def getIndexNameForWikiFormat(index_name, isIndexSupprimes, isReplaceUnderscore)
         res = "{color:red}" + res + "{color}"
     return res
 
-#
-# Affichage des données d'entete pour les indexs
-#
+
 def afficherDonneesIndexEntete(outputFormat, lstTirNames) :
+    """
+    Affichage des données d'entete pour les indexs
+    """
+
     # Affichage de l'entete (init) - PARTIE 1/3
     if outputFormat is None :
         ligneout = "# NOM_INDEX"
@@ -290,10 +301,11 @@ def afficherDonneesIndexEntete(outputFormat, lstTirNames) :
 
     return ligneout
 
-#
-# Affichage des données des indexs
-#
+
 def afficherDonneesIndex(ligneout, outputFormat, index_name, lstTirNames) :
+    """
+    Affichage des données des indexs
+    """
 
     # index_name = key
     dictTir = mapIndex[index_name]
@@ -338,10 +350,12 @@ def afficherDonneesIndex(ligneout, outputFormat, index_name, lstTirNames) :
 
     return ligneout
 
-#
-# Affichage des données détaillées des indexs au format de sortie voulu
-#
+
 def ETAPE4a_afficherDonneesIndexs(outputFormat, lstTirNames):
+    """
+    Affichage des données détaillées des indexs au format de sortie voulu
+    """
+
     utils.log_debug("Affichage des donnees détaillées sur les indexs au format {0}".format(outputFormat))
 
     # Affichage des données d'entete
@@ -356,10 +370,11 @@ def ETAPE4a_afficherDonneesIndexs(outputFormat, lstTirNames):
         utils.log(ligneout)
 
 
-#
-# Affichage des données d'entete pour les résumés
-#
 def afficherDonneesResumeEntete(outputFormat, lstTirNames) :
+    """
+    Affichage des données d'entete pour les résumés
+    """
+
     if outputFormat is None :
         ligneout = "# TIR; Date tir; Durée tir; nb indexs NON utilisés; nb indexs TRES PEU utilisés (<10); nb indexs PEU utilisés (<100); nb indexs TRES utilisés (>= 100 000); nb total indexs"
         utils.log_retourchariot(ligneout)
@@ -372,10 +387,11 @@ def afficherDonneesResumeEntete(outputFormat, lstTirNames) :
     return ligneout
 
 
-#
-# Affichage des données des résumés
-#
 def afficherDonneesTir(ligneout, outputFormat, tir_name) :
+    """
+    Affichage des données des résumés
+    """
+
     # index_name = key
     dictResume = mapResume[tir_name]
 
@@ -443,10 +459,11 @@ def afficherDonneesTir(ligneout, outputFormat, tir_name) :
     return ligneout
 
 
-#
-# Affichage des données détaillées des indexs au format de sortie voulu
-#
 def ETAPE4b_afficherDonneesResumesTir(outputFormat, lstTirNames):
+    """
+    Affichage des données détaillées des indexs au format de sortie voulu
+    """
+
     utils.log_debug("Affichage des donnees de Résumé par tir au format {0}".format(outputFormat))
 
     # Affichage des données d'entete
@@ -461,10 +478,10 @@ def ETAPE4b_afficherDonneesResumesTir(outputFormat, lstTirNames):
         utils.log(ligneout)
 
 
-#
-# Prog principal
-#
 def main(): 
+    """
+    Prog principal
+    """
 
     # Initialisation arguments
     global args
